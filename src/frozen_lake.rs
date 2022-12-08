@@ -1,13 +1,35 @@
-use std::cmp::min;
+use crate::{
+    environment::{Environment, Reward, StepResult},
+    mdp::FiniteMDP,
+};
+use std::{cmp::min, collections::HashMap};
 
-use crate::environment::{Environment, StepResult};
-
-#[derive(Debug, Clone, Copy)]
-pub enum GridAction {
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Direction {
     Up,
     Down,
     Left,
     Right,
+}
+
+impl Direction {
+    pub fn all() -> Vec<Self> {
+        vec![
+            Direction::Up,
+            Direction::Down,
+            Direction::Left,
+            Direction::Right,
+        ]
+    }
+
+    pub fn opposite(&self) -> Self {
+        match self {
+            Direction::Up => Direction::Down,
+            Direction::Down => Direction::Up,
+            Direction::Left => Direction::Right,
+            Direction::Right => Direction::Left,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -34,21 +56,33 @@ pub struct FrozenLake {
     cols: usize,
     start: usize,
     pos: usize,
+    is_slippery: bool,
 }
 
 impl FrozenLake {
-    pub fn new(rows: usize, cols: usize, start: usize, goal: usize, holes: Vec<usize>) -> Self {
+    pub fn new(
+        rows: usize,
+        cols: usize,
+        start: usize,
+        goal: usize,
+        holes: Vec<usize>,
+        is_slippery: bool,
+    ) -> Self {
         let mut grid = vec![Cell::Empty; rows * cols];
+
         grid[goal] = Cell::Goal;
+
         for hole in holes {
             grid[hole] = Cell::Hole;
         }
+
         Self {
             grid,
             rows,
             cols,
             start,
-            pos: 0,
+            pos: start,
+            is_slippery,
         }
     }
 
@@ -63,14 +97,26 @@ impl FrozenLake {
         }
     }
 
-    fn next_position(&self, position: usize, action: &GridAction) -> usize {
+    fn direction_weights(&self, direction: Direction) -> Vec<(Direction, f64)> {
+        if self.is_slippery {
+            Direction::all()
+                .into_iter()
+                .filter(|&d| d != direction.opposite())
+                .map(|d| (d, 1.0 / 3.0))
+                .collect::<Vec<_>>()
+        } else {
+            vec![(direction, 1.0)]
+        }
+    }
+
+    fn next_position(&self, position: usize, action: &Direction) -> usize {
         let mut row = position / self.cols;
         let mut col = position % self.cols;
         (row, col) = match action {
-            GridAction::Up => (row.saturating_sub(1), col),
-            GridAction::Down => (min(row + 1, self.cols - 1), col),
-            GridAction::Left => (row, col.saturating_sub(1)),
-            GridAction::Right => (row, min(col + 1, self.rows - 1)),
+            Direction::Up => (row.saturating_sub(1), col),
+            Direction::Down => (min(row + 1, self.cols - 1), col),
+            Direction::Left => (row, col.saturating_sub(1)),
+            Direction::Right => (row, min(col + 1, self.rows - 1)),
         };
         row * self.cols + col
     }
@@ -94,13 +140,13 @@ impl FrozenLake {
 
 impl Environment for FrozenLake {
     type State = usize;
-    type Action = GridAction;
+    type Action = Direction;
 
     fn current_state(&self) -> &Self::State {
         &self.pos
     }
 
-    fn step(&mut self, action: &GridAction) -> Result<StepResult<usize>, String> {
+    fn step(&mut self, action: &Direction) -> Result<StepResult<usize>, String> {
         if self.is_done() {
             return Err("Episode has terminated".to_string());
         }
@@ -119,13 +165,48 @@ impl Environment for FrozenLake {
     }
 }
 
+impl FiniteMDP for FrozenLake {
+    type State = usize;
+    type Action = Direction;
+
+    fn states(&self) -> Vec<Self::State> {
+        (0..self.grid.len()).collect()
+    }
+
+    fn actions(&self) -> Vec<Self::Action> {
+        Direction::all()
+    }
+
+    fn transition(&self, state: &Self::State, action: &Self::Action) -> HashMap<usize, f64> {
+        let mut transitions = HashMap::new();
+        for (dir, weight) in self.direction_weights(*action) {
+            let next_state = self.next_position(*state, &dir);
+            *transitions.entry(next_state).or_insert(0.0) += weight;
+        }
+        transitions
+    }
+
+    fn reward(
+        &self,
+        _state: &Self::State,
+        _action: &Self::Action,
+        next_state: &Self::State,
+    ) -> Reward {
+        if self.grid[*next_state] == Cell::Goal {
+            1.0
+        } else {
+            0.0
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn test_hole_termination() {
-        let mut env = FrozenLake::new(4, 4, 0, 15, vec![5, 7, 11, 12]);
+        let mut env = FrozenLake::new(4, 4, 0, 15, vec![5, 7, 11, 12], false);
 
         let state = env.reset().clone();
         assert_eq!(state, 0);
@@ -133,40 +214,40 @@ mod tests {
         assert_eq!(state, env.pos);
         assert_eq!(env.is_done(), false);
 
-        let result = env.step(&GridAction::Right).unwrap();
+        let result = env.step(&Direction::Right).unwrap();
         assert_eq!(result.state, 1);
         assert_eq!(result.is_done, false);
         assert_eq!(result.reward, 0.0);
 
-        env.step(&GridAction::Right).unwrap();
-        env.step(&GridAction::Right).unwrap();
+        env.step(&Direction::Right).unwrap();
+        env.step(&Direction::Right).unwrap();
         assert_eq!(env.pos, 3);
 
         // moving toward a wall does not change the state
-        env.step(&GridAction::Right).unwrap();
+        env.step(&Direction::Right).unwrap();
         assert_eq!(env.pos, 3);
 
-        let result = env.step(&GridAction::Down).unwrap();
+        let result = env.step(&Direction::Down).unwrap();
         assert_eq!(result.state, 7);
         assert_eq!(result.is_done, true);
         assert_eq!(result.reward, 0.0);
 
-        let result = env.step(&GridAction::Down);
+        let result = env.step(&Direction::Down);
         assert!(result.is_err());
     }
 
     #[test]
     fn test_goal_termination() {
-        let mut env = FrozenLake::new(4, 4, 0, 15, vec![5, 7, 11, 12]);
+        let mut env = FrozenLake::new(4, 4, 0, 15, vec![5, 7, 11, 12], false);
         env.reset();
-        env.step(&GridAction::Down).unwrap();
-        env.step(&GridAction::Down).unwrap();
-        env.step(&GridAction::Right).unwrap();
-        env.step(&GridAction::Right).unwrap();
-        env.step(&GridAction::Down).unwrap();
+        env.step(&Direction::Down).unwrap();
+        env.step(&Direction::Down).unwrap();
+        env.step(&Direction::Right).unwrap();
+        env.step(&Direction::Right).unwrap();
+        env.step(&Direction::Down).unwrap();
 
         // agent reaches goal
-        let result = env.step(&GridAction::Right).unwrap();
+        let result = env.step(&Direction::Right).unwrap();
         assert!(result.is_done);
         assert_eq!(result.reward, 1.0);
         assert!(env.is_done());
