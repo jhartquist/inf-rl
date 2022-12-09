@@ -4,7 +4,7 @@ use crate::{
 };
 use std::{cmp::min, collections::HashMap};
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
 pub enum Direction {
     Up,
     Down,
@@ -166,9 +166,6 @@ impl Environment for FrozenLake {
 }
 
 impl FiniteMDP for FrozenLake {
-    type State = usize;
-    type Action = Direction;
-
     fn states(&self) -> Vec<Self::State> {
         (0..self.grid.len()).collect()
     }

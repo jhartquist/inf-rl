@@ -1,3 +1,15 @@
+use std::fmt::Debug;
+use std::hash::Hash;
+
+pub trait Environment {
+    type State: Copy + Clone + Hash + Eq + Debug;
+    type Action: Copy + Clone + Hash + Eq + Debug;
+
+    fn current_state(&self) -> &Self::State;
+    fn step(&mut self, action: &Self::Action) -> Result<StepResult<Self::State>, String>;
+    fn reset(&mut self) -> &Self::State;
+}
+
 pub type Reward = f64;
 
 #[derive(Debug, Clone, Copy)]
@@ -15,13 +27,4 @@ impl<State> StepResult<State> {
             is_done,
         }
     }
-}
-
-pub trait Environment {
-    type State;
-    type Action;
-
-    fn current_state(&self) -> &Self::State;
-    fn step(&mut self, action: &Self::Action) -> Result<StepResult<Self::State>, String>;
-    fn reset(&mut self) -> &Self::State;
 }
