@@ -30,7 +30,7 @@ where
     state_values
 }
 
-pub fn solve<M: MPD<State = usize>>(mdp: &M) {
+pub fn solve<M: MPD>(mdp: &M) {
     println!("{}", mdp.render());
 
     let states = mdp.states();
@@ -38,12 +38,15 @@ pub fn solve<M: MPD<State = usize>>(mdp: &M) {
 
     let action = actions.last().expect("At least one action");
 
-    let policy = DeterministicPolicy::new(vec![action.clone(); states.len()]);
+    let state_actions = states.iter().map(|s| (s.clone(), action.clone())).collect();
+    let policy = DeterministicPolicy::new(state_actions);
 
     println!("{}", mdp.render_policy(&policy));
 
     // TODO: remove the type annotation by combining into only one generic type?
     let state_values = evaluate_policy::<M, DeterministicPolicy<M>>(&mdp, &policy);
 
-    println!("state vals: {:?}", state_values);
+    for (i, state) in states.iter().enumerate() {
+        println!("{:>2} - {:>.3}", i, state_values.get(state).unwrap());
+    }
 }
