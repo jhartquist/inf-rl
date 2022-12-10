@@ -1,23 +1,12 @@
-use crate::{environment::Environment, mdp::FiniteMDP};
+use crate::{
+    mdp::MPD,
+    policy::{DeterministicPolicy, Policy},
+};
 use std::collections::HashMap;
-
-pub trait Policy<E: Environment> {
-    fn get_action(&self, state: &E::State) -> E::Action;
-}
-
-struct DeterministicPolicy<E: Environment<State = usize>> {
-    state_actions: Vec<E::Action>,
-}
-
-impl<E: Environment<State = usize>> Policy<E> for DeterministicPolicy<E> {
-    fn get_action(&self, state: &usize) -> E::Action {
-        self.state_actions[*state]
-    }
-}
 
 pub fn evaluate_policy<M, P>(mdp: &M, policy: &P) -> HashMap<M::State, f64>
 where
-    M: FiniteMDP,
+    M: MPD,
     P: Policy<M>,
 {
     let mut state_values = HashMap::new();
@@ -41,19 +30,20 @@ where
     state_values
 }
 
-pub fn solve<M: FiniteMDP<State = usize>>(mdp: &M) {
+pub fn solve<M: MPD<State = usize>>(mdp: &M) {
+    println!("{}", mdp.render());
+
     let states = mdp.states();
     let actions = mdp.actions();
 
     let action = actions.last().expect("At least one action");
 
-    let policy = DeterministicPolicy {
-        state_actions: vec![action.clone(); states.len()],
-    };
+    let policy = DeterministicPolicy::new(vec![action.clone(); states.len()]);
 
-    println!("{:?}", policy.state_actions);
+    println!("{}", mdp.render_policy(&policy));
 
     // TODO: remove the type annotation by combining into only one generic type?
     let state_values = evaluate_policy::<M, DeterministicPolicy<M>>(&mdp, &policy);
+
     println!("state vals: {:?}", state_values);
 }

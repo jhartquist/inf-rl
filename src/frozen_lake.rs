@@ -1,7 +1,9 @@
 use crate::{
     environment::{Environment, Reward, StepResult},
-    mdp::FiniteMDP,
+    mdp::MPD,
+    policy::Policy,
 };
+use std::fmt::Write;
 use std::{cmp::min, collections::HashMap};
 
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
@@ -120,22 +122,6 @@ impl FrozenLake {
         };
         row * self.cols + col
     }
-
-    pub fn render(&self) {
-        for row in 0..self.rows {
-            for col in 0..self.cols {
-                let index = row * self.cols + col;
-                let c = if index == self.pos {
-                    'A'
-                } else {
-                    self.grid[index].render()
-                };
-                print!("{}", c);
-            }
-            println!()
-        }
-        println!();
-    }
 }
 
 impl Environment for FrozenLake {
@@ -163,9 +149,27 @@ impl Environment for FrozenLake {
         self.pos = self.start;
         &self.pos
     }
+
+    fn render(&self) -> String {
+        let mut s = String::new();
+        for row in 0..self.rows {
+            for col in 0..self.cols {
+                let index = row * self.cols + col;
+                let c = if index == self.pos {
+                    'A'
+                } else {
+                    self.grid[index].render()
+                };
+                write!(s, "{}", c).unwrap();
+            }
+            writeln!(s).unwrap();
+        }
+        writeln!(s).unwrap();
+        s
+    }
 }
 
-impl FiniteMDP for FrozenLake {
+impl MPD for FrozenLake {
     fn states(&self) -> Vec<Self::State> {
         (0..self.grid.len()).collect()
     }
@@ -193,6 +197,26 @@ impl FiniteMDP for FrozenLake {
             1.0
         } else {
             0.0
+        }
+    }
+
+    fn render_policy<P>(&self, policy: &P) -> String
+    where
+        P: Policy<Self>,
+        Self: Sized,
+    {
+        {
+            let mut s = String::new();
+            for row in 0..self.rows {
+                for col in 0..self.cols {
+                    let index = row * self.cols + col;
+                    let action = policy.get_action(&index);
+                    write!(s, "{:?} ", action).unwrap();
+                }
+                writeln!(s).unwrap();
+            }
+            writeln!(s).unwrap();
+            s
         }
     }
 }

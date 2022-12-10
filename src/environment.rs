@@ -8,6 +8,10 @@ pub trait Environment {
     fn current_state(&self) -> &Self::State;
     fn step(&mut self, action: &Self::Action) -> Result<StepResult<Self::State>, String>;
     fn reset(&mut self) -> &Self::State;
+
+    fn render(&self) -> String {
+        unimplemented!();
+    }
 }
 
 pub type Reward = f64;
