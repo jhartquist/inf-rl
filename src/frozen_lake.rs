@@ -3,7 +3,7 @@ use crate::{
     mdp::MPD,
     policy::Policy,
 };
-use std::fmt::Write;
+use std::fmt::{Display, Write};
 use std::{cmp::min, collections::HashMap};
 
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
@@ -30,6 +30,17 @@ impl Direction {
             Direction::Down => Direction::Up,
             Direction::Left => Direction::Right,
             Direction::Right => Direction::Left,
+        }
+    }
+}
+
+impl Display for Direction {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Direction::Up => write!(f, "↑"),
+            Direction::Down => write!(f, "↓"),
+            Direction::Left => write!(f, "←"),
+            Direction::Right => write!(f, "→"),
         }
     }
 }
@@ -211,7 +222,7 @@ impl MPD for FrozenLake {
                 for col in 0..self.cols {
                     let index = row * self.cols + col;
                     let action = policy.get_action(&index);
-                    write!(s, "{:?} ", action).unwrap();
+                    write!(s, "{} ", action).unwrap();
                 }
                 writeln!(s).unwrap();
             }

@@ -1,9 +1,9 @@
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 use std::hash::Hash;
 
 pub trait Environment {
     type State: Copy + Clone + Hash + Eq + Debug;
-    type Action: Copy + Clone + Hash + Eq + Debug;
+    type Action: Copy + Clone + Hash + Eq + Debug + Display;
 
     fn current_state(&self) -> &Self::State;
     fn step(&mut self, action: &Self::Action) -> Result<StepResult<Self::State>, String>;
