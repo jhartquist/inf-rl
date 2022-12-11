@@ -1,6 +1,6 @@
 use crate::{
     environment::{Environment, Reward, StepResult},
-    mdp::MPD,
+    mdp::MDP,
     policy::Policy,
 };
 use std::fmt::{Display, Write};
@@ -110,6 +110,14 @@ impl FrozenLake {
         }
     }
 
+    // TODO: refactor this & improve the name
+    fn is_done_for_position(&self, position: usize) -> bool {
+        match &self.grid[position] {
+            Cell::Hole | Cell::Goal => true,
+            _ => false,
+        }
+    }
+
     fn direction_weights(&self, direction: Direction) -> Vec<(Direction, f64)> {
         if self.is_slippery {
             Direction::all()
@@ -180,7 +188,7 @@ impl Environment for FrozenLake {
     }
 }
 
-impl MPD for FrozenLake {
+impl MDP for FrozenLake {
     fn states(&self) -> Vec<Self::State> {
         (0..self.grid.len()).collect()
     }
@@ -191,6 +199,12 @@ impl MPD for FrozenLake {
 
     fn transition(&self, state: &Self::State, action: &Self::Action) -> HashMap<usize, f64> {
         let mut transitions = HashMap::new();
+
+        let is_terminal = self.is_done_for_position(*state);
+        if is_terminal {
+            return transitions;
+        }
+
         for (dir, weight) in self.direction_weights(*action) {
             let next_state = self.next_position(*state, &dir);
             *transitions.entry(next_state).or_insert(0.0) += weight;

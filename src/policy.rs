@@ -1,26 +1,23 @@
 use std::collections::HashMap;
 
-use crate::environment::Environment;
+use crate::{environment::Environment, mdp::MDP};
 
 pub trait Policy<E: Environment> {
     fn get_action(&self, state: &E::State) -> E::Action;
 }
 
-pub struct DeterministicPolicy<E: Environment> {
-    state_actions: HashMap<E::State, E::Action>,
+pub struct MDPPolicy<M: MDP> {
+    state_actions: HashMap<M::State, M::Action>,
 }
 
-impl<E: Environment> DeterministicPolicy<E> {
-    pub fn new(state_actions: HashMap<E::State, E::Action>) -> Self {
+impl<M: MDP> MDPPolicy<M> {
+    pub fn new(state_actions: HashMap<M::State, M::Action>) -> Self {
         Self { state_actions }
     }
 }
 
-impl<E: Environment> Policy<E> for DeterministicPolicy<E> {
-    fn get_action(&self, state: &E::State) -> E::Action {
-        self.state_actions
-            .get(state)
-            .expect("state_actions includes state")
-            .clone()
+impl<M: MDP> Policy<M> for MDPPolicy<M> {
+    fn get_action(&self, state: &M::State) -> M::Action {
+        self.state_actions[state].clone()
     }
 }
