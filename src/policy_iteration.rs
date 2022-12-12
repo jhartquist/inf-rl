@@ -1,18 +1,22 @@
+use rand::seq::SliceRandom;
+
 use crate::{
     mdp::MDP,
     policy::{MDPPolicy, Policy},
 };
 use std::collections::HashMap;
 
-pub fn evaluate_policy<M, P>(mdp: &M, policy: &P) -> (HashMap<M::State, f64>, usize)
+fn evaluate_policy<M, P>(
+    mdp: &M,
+    policy: &P,
+    discount_rate: f64,
+    threshold: f64,
+) -> (HashMap<M::State, f64>, usize)
 where
     M: MDP,
     P: Policy<M>,
 {
     let mut state_values_prev = HashMap::new();
-
-    let gamma = 0.99;
-    let theta = 1e-10;
 
     let mut num_iterations = 0;
 
@@ -26,8 +30,8 @@ where
                 .iter()
                 .map(|(next_state, prob)| {
                     let reward = mdp.reward(&state, &action, &next_state);
-                    // TODO: only add future rewards if not in terminal state
-                    prob * (reward + gamma * state_values_prev.get(next_state).unwrap_or(&0.0))
+                    prob * (reward
+                        + discount_rate * state_values_prev.get(next_state).unwrap_or(&0.0))
                 })
                 .sum();
             state_values.insert(state, state_value);
@@ -47,7 +51,7 @@ where
             .max_by(|a, b| a.partial_cmp(b).unwrap())
             .unwrap();
 
-        if max_diff < theta {
+        if max_diff < threshold {
             return (state_values, num_iterations);
         } else {
             state_values_prev = state_values.clone();
@@ -55,15 +59,14 @@ where
     }
 }
 
-pub fn improve_policy<M>(
+fn improve_policy<M>(
     mdp: &M,
     state_values: HashMap<M::State, f64>,
+    discount_rate: f64,
 ) -> HashMap<M::State, M::Action>
 where
     M: MDP,
 {
-    let gamma = 0.99;
-
     let mut state_action_values = HashMap::new();
 
     let actions = mdp.actions();
@@ -74,7 +77,7 @@ where
                 let reward = mdp.reward(&state, action, &next_state);
                 let action_value = action_values.entry(action).or_insert(0.0);
                 *action_value +=
-                    prob * (reward + gamma * state_values.get(&next_state).unwrap_or(&0.0));
+                    prob * (reward + discount_rate * state_values.get(&next_state).unwrap_or(&0.0));
             }
         }
     }
@@ -92,60 +95,41 @@ where
         .collect()
 }
 
-pub fn solve<M: MDP>(mdp: &M) {
-    // println!("{}", mdp.render());
-
-    // mdp.print_transitions();
-    // println!();
-
-    let states = mdp.states();
+pub fn policy_iteration<M>(mdp: &M, discount_rate: f64, threshold: f64) -> MDPPolicy<M>
+where
+    M: MDP,
+{
     let actions = mdp.actions();
+    let states = mdp.states();
 
-    // matches the example from GRDL on p.81
-    // let random_actions: Vec<_> = vec![3, 2, 1, 0, 2, 0, 3, 0, 0, 1, 0, 0, 0, 3, 1, 0]
-    //     .into_iter()
-    //     .map(|i| actions[i])
-    //     .collect();
+    let mut rng = rand::thread_rng();
 
-    // adversarial actions pg88
-    // let random_actions: Vec<_> = vec![0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 2, 2, 0]
-    //     .into_iter()
-    //     .map(|i| actions[i])
-    //     .collect();
-
-    // careful policy pg84
-    let random_actions: Vec<_> = vec![2, 0, 0, 0, 2, 0, 0, 0, 0, 1, 2, 0, 0, 3, 3, 0]
+    let mut state_actions: HashMap<M::State, M::Action> = states
         .into_iter()
-        .map(|i| actions[i])
+        .map(|state| {
+            let action = actions
+                .choose(&mut rng)
+                .expect("at least one action")
+                .clone();
+            (state, action)
+        })
         .collect();
 
-    let state_actions = states
-        .iter()
-        .zip(random_actions)
-        .map(|(s, a)| (s.clone(), a.clone()))
-        .collect();
+    let mut num_iterations = 0;
+    loop {
+        num_iterations += 1;
 
-    let policy = MDPPolicy::new(state_actions);
+        let policy = MDPPolicy::new(state_actions.clone());
+        mdp.render_policy(&policy);
 
-    println!("{}", mdp.render_policy(&policy));
+        let (state_values, _) = evaluate_policy(mdp, &policy, discount_rate, threshold);
+        let new_state_actions = improve_policy(mdp, state_values, discount_rate);
 
-    let (state_values, num_iterations) = evaluate_policy(mdp, &policy);
-    println!("num iterations: {}", num_iterations);
-
-    for (i, state) in states.iter().enumerate() {
-        println!("{:>2} - {:>.4}", i, state_values.get(state).unwrap());
-    }
-
-    println!("-------");
-
-    let new_state_actions = improve_policy(mdp, state_values);
-    let policy = MDPPolicy::new(new_state_actions);
-    println!("{}", mdp.render_policy(&policy));
-
-    let (state_values, num_iterations) = evaluate_policy(mdp, &policy);
-    println!("num iterations: {}", num_iterations);
-
-    for (i, state) in states.iter().enumerate() {
-        println!("{:>2} - {:>.4}", i, state_values.get(state).unwrap());
+        if state_actions == new_state_actions {
+            println!("num iterations: {}", num_iterations);
+            return policy;
+        } else {
+            state_actions = new_state_actions;
+        }
     }
 }

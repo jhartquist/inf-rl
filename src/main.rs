@@ -7,10 +7,15 @@ mod policy_iteration;
 
 use frozen_lake::FrozenLake;
 
+use crate::mdp::MDP;
+
 fn main() -> Result<(), String> {
     let env = FrozenLake::new(4, 4, 0, 15, vec![5, 7, 11, 12], true);
 
-    policy_iteration::solve(&env);
+    let discount_rate = 0.99;
+    let threshold = 1e-10;
+    let policy = policy_iteration::policy_iteration(&env, discount_rate, threshold);
+    println!("{}", env.render_policy(&policy));
 
     Ok(())
 }
