@@ -14,7 +14,8 @@ fn main() -> Result<(), String> {
 
     let discount_rate = 0.99;
     let threshold = 1e-10;
-    let policy = policy_iteration::policy_iteration(&env, discount_rate, threshold);
+    let mut rng = rand::thread_rng();
+    let policy = policy_iteration::policy_iteration(&env, discount_rate, threshold, &mut rng);
     println!("{}", env.render_policy(&policy));
 
     Ok(())

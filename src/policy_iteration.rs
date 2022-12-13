@@ -1,4 +1,4 @@
-use rand::seq::SliceRandom;
+use rand::{rngs::ThreadRng, seq::SliceRandom};
 
 use crate::{
     mdp::MDP,
@@ -16,13 +16,16 @@ where
     M: MDP,
     P: Policy<M>,
 {
-    let mut state_values_prev = HashMap::new();
+    let mut state_values_prev: HashMap<M::State, f64> = mdp
+        .states()
+        .into_iter()
+        .zip(std::iter::repeat(0.0))
+        .collect();
+    let mut state_values = state_values_prev.clone();
 
     let mut num_iterations = 0;
 
     loop {
-        let mut state_values = HashMap::new();
-
         for state in mdp.states() {
             let action = policy.get_action(&state);
             let transitions = mdp.transition(&state, &action);
@@ -30,8 +33,8 @@ where
                 .iter()
                 .map(|(next_state, prob)| {
                     let reward = mdp.reward(&state, &action, &next_state);
-                    prob * (reward
-                        + discount_rate * state_values_prev.get(next_state).unwrap_or(&0.0))
+                    let next_state_value = state_values_prev.get(next_state).unwrap_or(&0.0);
+                    prob * (reward + discount_rate * next_state_value)
                 })
                 .sum();
             state_values.insert(state, state_value);
@@ -42,19 +45,13 @@ where
         let max_diff = mdp
             .states()
             .iter()
-            .map(|s| {
-                // TODO: refactor this out
-                let n1 = *state_values.get(s).unwrap_or(&0.0);
-                let n2 = *state_values_prev.get(s).unwrap_or(&0.0);
-                (n1 - n2).abs()
-            })
-            .max_by(|a, b| a.partial_cmp(b).unwrap())
-            .unwrap();
+            .map(|s| (state_values[s] - state_values_prev[s]).abs())
+            .fold(f64::NEG_INFINITY, f64::max);
 
         if max_diff < threshold {
             return (state_values, num_iterations);
         } else {
-            state_values_prev = state_values.clone();
+            (state_values_prev, state_values) = (state_values, state_values_prev);
         }
     }
 }
@@ -76,8 +73,8 @@ where
             for (next_state, prob) in mdp.transition(&state, action) {
                 let reward = mdp.reward(&state, action, &next_state);
                 let action_value = action_values.entry(action).or_insert(0.0);
-                *action_value +=
-                    prob * (reward + discount_rate * state_values.get(&next_state).unwrap_or(&0.0));
+                let next_value = state_values.get(&next_state).unwrap_or(&0.0);
+                *action_value += prob * (reward + discount_rate * next_value);
             }
         }
     }
@@ -95,22 +92,23 @@ where
         .collect()
 }
 
-pub fn policy_iteration<M>(mdp: &M, discount_rate: f64, threshold: f64) -> MDPPolicy<M>
+pub fn policy_iteration<M>(
+    mdp: &M,
+    discount_rate: f64,
+    threshold: f64,
+    rng: &mut ThreadRng,
+) -> MDPPolicy<M>
 where
     M: MDP,
 {
     let actions = mdp.actions();
     let states = mdp.states();
 
-    let mut rng = rand::thread_rng();
-
+    // random policy
     let mut state_actions: HashMap<M::State, M::Action> = states
         .into_iter()
         .map(|state| {
-            let action = actions
-                .choose(&mut rng)
-                .expect("at least one action")
-                .clone();
+            let action = actions.choose(rng).expect("at least one action").clone();
             (state, action)
         })
         .collect();
