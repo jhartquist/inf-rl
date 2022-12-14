@@ -37,4 +37,12 @@ pub trait MDP: Environment {
             }
         }
     }
+
+    fn state_actions(&self) -> Vec<(Self::State, Self::Action)> {
+        let actions = self.actions();
+        self.states()
+            .iter()
+            .flat_map(|state| actions.iter().map(|action| (state.clone(), action.clone())))
+            .collect()
+    }
 }
