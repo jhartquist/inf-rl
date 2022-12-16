@@ -49,6 +49,7 @@ where
             .fold(f64::NEG_INFINITY, f64::max);
 
         if max_diff < threshold {
+            println!("  {}", num_iterations);
             return (state_values, num_iterations);
         } else {
             (state_values_prev, state_values) = (state_values, state_values_prev);
@@ -128,4 +129,75 @@ where
             state_actions = new_state_actions;
         }
     }
+}
+
+pub fn value_iteration<M>(mdp: &M, discount_rate: f64, threshold: f64) -> MDPPolicy<M>
+where
+    M: MDP,
+{
+    let actions = mdp.actions();
+
+    let mut state_values_prev: HashMap<M::State, f64> =
+        mdp.states().into_iter().map(|s| (s, 0.0)).collect();
+
+    let mut num_iterations = 0;
+
+    let mut state_action_values: HashMap<M::State, HashMap<M::Action, f64>>;
+
+    loop {
+        num_iterations += 1;
+        state_action_values = HashMap::new();
+
+        for (state, action) in mdp.state_actions() {
+            let action_values = &mut state_action_values.entry(state).or_insert(HashMap::new());
+            for (next_state, prob) in mdp.transition(&state, &action) {
+                let reward = mdp.reward(&state, &action, &next_state);
+                let action_value = action_values.entry(action).or_insert(0.0);
+                let next_value = state_values_prev.get(&next_state).unwrap_or(&0.0);
+                *action_value += prob * (reward + discount_rate * next_value);
+            }
+        }
+
+        let state_values: HashMap<M::State, f64> = state_action_values
+            .iter()
+            .map(|(state, action_values)| {
+                let max_value = if action_values.len() > 0 {
+                    action_values
+                        .values()
+                        .cloned()
+                        .fold(f64::NEG_INFINITY, f64::max)
+                } else {
+                    0.0
+                };
+                (state.clone(), max_value)
+            })
+            .collect();
+
+        let max_diff = mdp
+            .states()
+            .iter()
+            .map(|s| (state_values[s] - state_values_prev[s]).abs())
+            .fold(f64::NEG_INFINITY, f64::max);
+
+        if max_diff < threshold {
+            println!("num_iterations: {}", num_iterations);
+            break;
+        } else {
+            state_values_prev = state_values;
+        }
+    }
+
+    let state_actions: HashMap<M::State, M::Action> = state_action_values
+        .iter()
+        .map(|(state, action_values)| {
+            let best_action = action_values
+                .into_iter()
+                .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
+                .unwrap_or((actions.first().unwrap(), &0.0))
+                .0;
+            (state.clone(), best_action.clone())
+        })
+        .collect();
+
+    MDPPolicy::new(state_actions)
 }
