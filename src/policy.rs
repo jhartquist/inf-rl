@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
-use crate::{environment::Environment, mdp::MDP};
+use crate::mdp::MDP;
 
-pub trait Policy<E: Environment> {
-    fn get_action(&self, state: &E::State) -> E::Action;
+pub trait Policy<S, A> {
+    fn get_action(&self, state: &S) -> A;
 }
 
 pub struct MDPPolicy<M: MDP> {
@@ -16,7 +16,7 @@ impl<M: MDP> MDPPolicy<M> {
     }
 }
 
-impl<M: MDP> Policy<M> for MDPPolicy<M> {
+impl<M: MDP> Policy<M::State, M::Action> for MDPPolicy<M> {
     fn get_action(&self, state: &M::State) -> M::Action {
         self.state_actions[state].clone()
     }

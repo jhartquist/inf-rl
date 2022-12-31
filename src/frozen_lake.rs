@@ -70,6 +70,9 @@ pub struct FrozenLake {
     start: usize,
     pos: usize,
     is_slippery: bool,
+    //
+    states: Vec<usize>,
+    actions: Vec<Direction>,
 }
 
 impl FrozenLake {
@@ -89,6 +92,9 @@ impl FrozenLake {
             grid[hole] = Cell::Hole;
         }
 
+        let states = (0..grid.len()).collect();
+        let actions = Direction::all();
+
         Self {
             grid,
             rows,
@@ -96,6 +102,8 @@ impl FrozenLake {
             start,
             pos: start,
             is_slippery,
+            states,
+            actions,
         }
     }
 
@@ -189,12 +197,15 @@ impl Environment for FrozenLake {
 }
 
 impl MDP for FrozenLake {
-    fn states(&self) -> Vec<Self::State> {
-        (0..self.grid.len()).collect()
+    type State = usize;
+    type Action = Direction;
+
+    fn get_states(&self) -> &[Self::State] {
+        &self.states
     }
 
-    fn actions(&self) -> Vec<Self::Action> {
-        Direction::all()
+    fn get_actions(&self) -> &[Self::Action] {
+        &self.actions
     }
 
     fn transition(&self, state: &Self::State, action: &Self::Action) -> HashMap<usize, f64> {
@@ -227,8 +238,8 @@ impl MDP for FrozenLake {
 
     fn render_policy<P>(&self, policy: &P) -> String
     where
-        P: Policy<Self>,
-        Self: Sized,
+        P: Policy<Self::State, Self::Action>,
+        // Self: Sized,
     {
         {
             let mut s = String::new();

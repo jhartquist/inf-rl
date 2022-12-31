@@ -1,13 +1,22 @@
-use std::collections::HashMap;
+use std::hash::Hash;
+use std::{cmp::Eq, collections::HashMap};
 
-use crate::{
-    environment::{Environment, Reward},
-    policy::Policy,
-};
+use itertools::{Itertools, Product};
 
-pub trait MDP: Environment {
-    fn states(&self) -> Vec<Self::State>;
-    fn actions(&self) -> Vec<Self::Action>;
+use crate::policy::Policy;
+
+#[allow(dead_code)]
+type StateActionIter<'a, S, A> = Product<std::slice::Iter<'a, S>, std::slice::Iter<'a, A>>;
+
+type Reward = f64;
+
+pub trait MDP {
+    type State: Clone + Hash + Eq;
+    type Action: Clone + Hash + Eq;
+
+    fn get_states(&self) -> &[Self::State];
+    fn get_actions(&self) -> &[Self::Action];
+
     fn transition(&self, state: &Self::State, action: &Self::Action) -> HashMap<Self::State, f64>;
     fn reward(
         &self,
@@ -16,33 +25,87 @@ pub trait MDP: Environment {
         next_state: &Self::State,
     ) -> Reward;
 
+    fn state_actions(&self) -> StateActionIter<'_, Self::State, Self::Action> {
+        let states = self.get_states().into_iter();
+        let actions = self.get_actions().into_iter();
+        states.cartesian_product(actions)
+    }
+
     fn render_policy<P>(&self, _policy: &P) -> String
     where
-        P: Policy<Self>,
-        Self: Sized,
+        P: Policy<Self::State, Self::Action>,
+        // Self: Sized,
     {
         unimplemented!();
     }
+}
 
-    fn print_transitions(&self) {
-        let actions = self.actions();
-        for state in self.states() {
-            println!("state {:>2?}", state);
-            for action in &actions {
-                println!("  {}", action);
-                for (next_state, prob) in self.transition(&state, &action) {
-                    let reward = self.reward(&state, &action, &next_state);
-                    println!("    {:>2?} {:>3.1}%  {}", next_state, prob * 100.0, reward);
-                }
-            }
+//     fn print_transitions(&self) {
+//         let actions = self.actions();
+//         for state in self.states() {
+//             println!("state {:>2?}", state);
+//             for action in &actions {
+//                 println!("  {}", action);
+//                 for (next_state, prob) in self.transition(&state, &action) {
+//                     let reward = self.reward(&state, &action, &next_state);
+//                     println!("    {:>2?} {:>3.1}%  {}", next_state, prob * 100.0, reward);
+//                 }
+//             }
+//         }
+//     }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct VecMDP {
+        states: Vec<u8>,
+        actions: Vec<u16>,
+    }
+
+    impl MDP for VecMDP {
+        type State = u8;
+        type Action = u16;
+
+        fn get_states(&self) -> &[u8] {
+            &self.states
+        }
+        fn get_actions(&self) -> &[u16] {
+            &self.actions
+        }
+
+        fn transition(
+            &self,
+            _state: &Self::State,
+            _action: &Self::Action,
+        ) -> HashMap<Self::State, f64> {
+            HashMap::new()
+        }
+
+        fn reward(
+            &self,
+            _state: &Self::State,
+            _action: &Self::Action,
+            _next_state: &Self::State,
+        ) -> Reward {
+            0.0
         }
     }
 
-    fn state_actions(&self) -> Vec<(Self::State, Self::Action)> {
-        let actions = self.actions();
-        self.states()
-            .iter()
-            .flat_map(|state| actions.iter().map(|action| (state.clone(), action.clone())))
-            .collect()
+    #[test]
+    fn mdp_with_vecs() {
+        let mdp = VecMDP {
+            states: vec![1, 2, 3],
+            actions: vec![4, 5],
+        };
+
+        assert_eq!(mdp.get_states(), [1, 2, 3]);
+        assert_eq!(mdp.get_actions(), [4, 5]);
+        assert_eq!(
+            mdp.state_actions()
+                .map(|(&s, &a)| (s, a))
+                .collect::<Vec<_>>(),
+            vec![(1, 4), (1, 5), (2, 4), (2, 5), (3, 4), (3, 5),]
+        );
     }
 }

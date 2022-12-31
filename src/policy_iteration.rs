@@ -14,19 +14,20 @@ fn evaluate_policy<M, P>(
 ) -> (HashMap<M::State, f64>, usize)
 where
     M: MDP,
-    P: Policy<M>,
+    P: Policy<M::State, M::Action>,
 {
     let mut state_values_prev: HashMap<M::State, f64> = mdp
-        .states()
+        .get_states()
         .into_iter()
-        .zip(std::iter::repeat(0.0))
+        .map(|s| (s.clone(), 0.0))
         .collect();
+
     let mut state_values = state_values_prev.clone();
 
     let mut num_iterations = 0;
 
     loop {
-        for state in mdp.states() {
+        for state in mdp.get_states() {
             let action = policy.get_action(&state);
             let transitions = mdp.transition(&state, &action);
             let state_value = transitions
@@ -37,13 +38,13 @@ where
                     prob * (reward + discount_rate * next_state_value)
                 })
                 .sum();
-            state_values.insert(state, state_value);
+            state_values.insert(state.clone(), state_value);
         }
 
         num_iterations += 1;
 
         let max_diff = mdp
-            .states()
+            .get_states()
             .iter()
             .map(|s| (state_values[s] - state_values_prev[s]).abs())
             .fold(f64::NEG_INFINITY, f64::max);
@@ -77,16 +78,16 @@ where
         }
     }
 
-    let actions = mdp.actions();
+    let actions = mdp.get_actions();
     state_action_values
         .into_iter()
         .map(|(state, action_values)| {
             let best_action = action_values
                 .into_iter()
                 .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
-                .unwrap_or((*actions.first().unwrap(), 0.0))
+                .unwrap_or((actions.first().unwrap(), 0.0))
                 .0;
-            (state, best_action.clone())
+            (state.clone(), best_action.clone())
         })
         .collect()
 }
@@ -100,15 +101,15 @@ pub fn policy_iteration<M>(
 where
     M: MDP,
 {
-    let actions = mdp.actions();
-    let states = mdp.states();
+    let actions = mdp.get_actions();
+    let states = mdp.get_states();
 
     // random policy
     let mut state_actions: HashMap<M::State, M::Action> = states
         .into_iter()
         .map(|state| {
             let action = actions.choose(rng).expect("at least one action").clone();
-            (state, action)
+            (state.clone(), action)
         })
         .collect();
 
@@ -117,7 +118,7 @@ where
         num_iterations += 1;
 
         let policy = MDPPolicy::new(state_actions.clone());
-        mdp.render_policy(&policy);
+        // mdp.render_policy(&policy);
 
         let (state_values, _) = evaluate_policy(mdp, &policy, discount_rate, threshold);
         let new_state_actions = improve_policy(mdp, state_values, discount_rate);
@@ -135,10 +136,13 @@ pub fn value_iteration<M>(mdp: &M, discount_rate: f64, threshold: f64) -> MDPPol
 where
     M: MDP,
 {
-    let actions = mdp.actions();
+    let actions = mdp.get_actions();
 
-    let mut state_values_prev: HashMap<M::State, f64> =
-        mdp.states().into_iter().map(|s| (s, 0.0)).collect();
+    let mut state_values_prev: HashMap<M::State, f64> = mdp
+        .get_states()
+        .into_iter()
+        .map(|s| (s.clone(), 0.0))
+        .collect();
 
     let mut num_iterations = 0;
 
@@ -149,10 +153,12 @@ where
         state_action_values = HashMap::new();
 
         for (state, action) in mdp.state_actions() {
-            let action_values = &mut state_action_values.entry(state).or_insert(HashMap::new());
+            let action_values = &mut state_action_values
+                .entry(state.clone())
+                .or_insert(HashMap::new());
             for (next_state, prob) in mdp.transition(&state, &action) {
                 let reward = mdp.reward(&state, &action, &next_state);
-                let action_value = action_values.entry(action).or_insert(0.0);
+                let action_value = action_values.entry(action.clone()).or_insert(0.0);
                 let next_value = state_values_prev.get(&next_state).unwrap_or(&0.0);
                 *action_value += prob * (reward + discount_rate * next_value);
             }
@@ -174,7 +180,7 @@ where
             .collect();
 
         let max_diff = mdp
-            .states()
+            .get_states()
             .iter()
             .map(|s| (state_values[s] - state_values_prev[s]).abs())
             .fold(f64::NEG_INFINITY, f64::max);
