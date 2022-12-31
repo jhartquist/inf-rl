@@ -3,12 +3,13 @@ use std::{cmp::Eq, collections::HashMap};
 
 use itertools::{Itertools, Product};
 
+use crate::environment::Reward;
 use crate::policy::Policy;
 
 #[allow(dead_code)]
 type StateActionIter<'a, S, A> = Product<std::slice::Iter<'a, S>, std::slice::Iter<'a, A>>;
 
-type Reward = f64;
+type Probability = f64;
 
 pub trait MDP {
     type State: Clone + Hash + Eq;
@@ -17,7 +18,12 @@ pub trait MDP {
     fn get_states(&self) -> &[Self::State];
     fn get_actions(&self) -> &[Self::Action];
 
-    fn transition(&self, state: &Self::State, action: &Self::Action) -> HashMap<Self::State, f64>;
+    fn transition(
+        &self,
+        state: &Self::State,
+        action: &Self::Action,
+    ) -> HashMap<&Self::State, Probability>;
+
     fn reward(
         &self,
         state: &Self::State,
@@ -34,7 +40,6 @@ pub trait MDP {
     fn render_policy<P>(&self, _policy: &P) -> String
     where
         P: Policy<Self::State, Self::Action>,
-        // Self: Sized,
     {
         unimplemented!();
     }
@@ -53,6 +58,47 @@ pub trait MDP {
 //             }
 //         }
 //     }
+
+struct MDPEnvironment<'a, S, A>
+where
+    S: Clone + Hash + Eq,
+    A: Clone + Hash + Eq,
+{
+    states: Vec<S>,
+    actions: Vec<A>,
+    transitions: HashMap<(&'a S, &'a A), HashMap<&'a S, Probability>>,
+    rewards: HashMap<(&'a S, &'a A, &'a S), Reward>,
+}
+
+impl<S, A> MDP for MDPEnvironment<'_, S, A>
+where
+    S: Clone + Hash + Eq,
+    A: Clone + Hash + Eq,
+{
+    type State = S;
+    type Action = A;
+
+    fn get_states(&self) -> &[Self::State] {
+        &self.states
+    }
+
+    fn get_actions(&self) -> &[Self::Action] {
+        &self.actions
+    }
+
+    fn transition(&self, state: &Self::State, action: &Self::Action) -> HashMap<&S, Probability> {
+        self.transitions[&(state, action)].clone() // TODO: avoid clone by returning a slice?
+    }
+
+    fn reward(
+        &self,
+        state: &Self::State,
+        action: &Self::Action,
+        next_state: &Self::State,
+    ) -> Reward {
+        self.rewards[&(state, action, next_state)]
+    }
+}
 
 #[cfg(test)]
 mod tests {

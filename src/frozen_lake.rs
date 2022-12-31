@@ -208,19 +208,20 @@ impl MDP for FrozenLake {
         &self.actions
     }
 
-    fn transition(&self, state: &Self::State, action: &Self::Action) -> HashMap<usize, f64> {
+    fn transition(&self, state: &Self::State, action: &Self::Action) -> HashMap<&usize, f64> {
         let mut transitions = HashMap::new();
-
-        let is_terminal = self.is_done_for_position(*state);
-        if is_terminal {
-            return transitions;
-        }
-
-        for (dir, weight) in self.direction_weights(*action) {
-            let next_state = self.next_position(*state, &dir);
-            *transitions.entry(next_state).or_insert(0.0) += weight;
-        }
         transitions
+
+        // let is_terminal = self.is_done_for_position(*state);
+        // if is_terminal {
+        //     return transitions;
+        // }
+
+        // for (dir, weight) in self.direction_weights(*action) {
+        //     let next_state = self.next_position(*state, &dir);
+        //     *transitions.entry(&next_state).or_insert(0.0) += weight;
+        // }
+        // transitions
     }
 
     fn reward(

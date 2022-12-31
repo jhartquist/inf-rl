@@ -1,9 +1,11 @@
 use std::fmt::{Debug, Display};
 use std::hash::Hash;
 
+pub type Reward = f64;
+
 pub trait Environment {
-    type State: Copy + Clone + Hash + Eq + Debug;
-    type Action: Copy + Clone + Hash + Eq + Debug + Display;
+    type State: Clone + Hash + Debug;
+    type Action: Clone + Hash + Debug + Display;
 
     fn current_state(&self) -> &Self::State;
     fn step(&mut self, action: &Self::Action) -> Result<StepResult<Self::State>, String>;
@@ -13,8 +15,6 @@ pub trait Environment {
         unimplemented!();
     }
 }
-
-pub type Reward = f64;
 
 #[derive(Debug, Clone, Copy)]
 pub struct StepResult<State> {
