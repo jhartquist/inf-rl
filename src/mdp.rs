@@ -59,7 +59,7 @@ pub trait MDP {
 //         }
 //     }
 
-struct MDPEnvironment<'a, S, A>
+pub struct BasicMDP<'a, S, A>
 where
     S: Clone + Hash + Eq,
     A: Clone + Hash + Eq,
@@ -70,7 +70,27 @@ where
     rewards: HashMap<(&'a S, &'a A, &'a S), Reward>,
 }
 
-impl<S, A> MDP for MDPEnvironment<'_, S, A>
+impl<'a, S, A> BasicMDP<'a, S, A>
+where
+    S: Clone + Hash + Eq,
+    A: Clone + Hash + Eq,
+{
+    pub fn new(
+        states: Vec<S>,
+        actions: Vec<A>,
+        transitions: HashMap<(&'a S, &'a A), HashMap<&'a S, Probability>>,
+        rewards: HashMap<(&'a S, &'a A, &'a S), Reward>,
+    ) -> Self {
+        BasicMDP {
+            states,
+            actions,
+            transitions,
+            rewards,
+        }
+    }
+}
+
+impl<S, A> MDP for BasicMDP<'_, S, A>
 where
     S: Clone + Hash + Eq,
     A: Clone + Hash + Eq,
@@ -113,10 +133,10 @@ mod tests {
         type State = u8;
         type Action = u16;
 
-        fn get_states(&self) -> &[u8] {
+        fn get_states(&self) -> &[Self::State] {
             &self.states
         }
-        fn get_actions(&self) -> &[u16] {
+        fn get_actions(&self) -> &[Self::Action] {
             &self.actions
         }
 
@@ -124,7 +144,7 @@ mod tests {
             &self,
             _state: &Self::State,
             _action: &Self::Action,
-        ) -> HashMap<Self::State, f64> {
+        ) -> std::collections::HashMap<&Self::State, Probability> {
             HashMap::new()
         }
 

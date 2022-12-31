@@ -36,12 +36,13 @@ impl Direction {
 
 impl Display for Direction {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            Direction::Up => write!(f, "↑"),
-            Direction::Down => write!(f, "↓"),
-            Direction::Left => write!(f, "←"),
-            Direction::Right => write!(f, "→"),
-        }
+        let symbol = match self {
+            Direction::Up => "↑",
+            Direction::Down => "↓",
+            Direction::Left => "←",
+            Direction::Right => "→",
+        };
+        write!(f, "{}", symbol)
     }
 }
 
