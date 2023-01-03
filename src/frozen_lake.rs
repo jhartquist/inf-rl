@@ -209,10 +209,8 @@ impl MDP for FrozenLake {
         &self.actions
     }
 
-    fn transition(&self, state: &Self::State, action: &Self::Action) -> HashMap<&usize, f64> {
-        let mut transitions = HashMap::new();
-        transitions
-
+    fn transition(&self, state: Self::State, action: Self::Action) -> &[(usize, f64)] {
+        todo!()
         // let is_terminal = self.is_done_for_position(*state);
         // if is_terminal {
         //     return transitions;
@@ -227,11 +225,11 @@ impl MDP for FrozenLake {
 
     fn reward(
         &self,
-        _state: &Self::State,
-        _action: &Self::Action,
-        next_state: &Self::State,
+        _state: Self::State,
+        _action: Self::Action,
+        next_state: Self::State,
     ) -> Reward {
-        if self.grid[*next_state] == Cell::Goal {
+        if self.grid[next_state] == Cell::Goal {
             1.0
         } else {
             0.0

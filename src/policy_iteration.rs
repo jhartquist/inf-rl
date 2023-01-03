@@ -27,14 +27,14 @@ where
     let mut num_iterations = 0;
 
     loop {
-        for state in mdp.get_states() {
+        for &state in mdp.get_states() {
             let action = policy.get_action(&state);
-            let transitions = mdp.transition(&state, &action);
+            let transitions = mdp.transition(state, action);
             let state_value = transitions
                 .iter()
-                .map(|(next_state, prob)| {
-                    let reward = mdp.reward(&state, &action, &next_state);
-                    let next_state_value = state_values_prev.get(next_state).unwrap_or(&0.0);
+                .map(|&(next_state, prob)| {
+                    let reward = mdp.reward(state, action, next_state);
+                    let next_state_value = state_values_prev.get(&next_state).unwrap_or(&0.0);
                     prob * (reward + discount_rate * next_state_value)
                 })
                 .sum();
@@ -68,10 +68,10 @@ where
 {
     let mut state_action_values = HashMap::new();
 
-    for (state, action) in mdp.state_actions() {
+    for (&state, &action) in mdp.state_actions() {
         let action_values = &mut state_action_values.entry(state).or_insert(HashMap::new());
-        for (next_state, prob) in mdp.transition(&state, &action) {
-            let reward = mdp.reward(&state, &action, &next_state);
+        for &(next_state, prob) in mdp.transition(state, action) {
+            let reward = mdp.reward(state, action, next_state);
             let action_value = action_values.entry(action).or_insert(0.0);
             let next_value = state_values.get(&next_state).unwrap_or(&0.0);
             *action_value += prob * (reward + discount_rate * next_value);
@@ -85,7 +85,7 @@ where
             let best_action = action_values
                 .into_iter()
                 .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
-                .unwrap_or((actions.first().unwrap(), 0.0))
+                .unwrap_or((*actions.first().unwrap(), 0.0))
                 .0;
             (state.clone(), best_action.clone())
         })
@@ -152,12 +152,12 @@ where
         num_iterations += 1;
         state_action_values = HashMap::new();
 
-        for (state, action) in mdp.state_actions() {
+        for (&state, &action) in mdp.state_actions() {
             let action_values = &mut state_action_values
                 .entry(state.clone())
                 .or_insert(HashMap::new());
-            for (next_state, prob) in mdp.transition(&state, &action) {
-                let reward = mdp.reward(&state, &action, &next_state);
+            for &(next_state, prob) in mdp.transition(state, action) {
+                let reward = mdp.reward(state, action, next_state);
                 let action_value = action_values.entry(action.clone()).or_insert(0.0);
                 let next_value = state_values_prev.get(&next_state).unwrap_or(&0.0);
                 *action_value += prob * (reward + discount_rate * next_value);

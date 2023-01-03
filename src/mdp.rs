@@ -9,27 +9,18 @@ use crate::policy::Policy;
 #[allow(dead_code)]
 type StateActionIter<'a, S, A> = Product<std::slice::Iter<'a, S>, std::slice::Iter<'a, A>>;
 
-type Probability = f64;
+pub type Probability = f64;
 
 pub trait MDP {
-    type State: Clone + Hash + Eq;
-    type Action: Clone + Hash + Eq;
+    type State: Copy + Hash + Eq;
+    type Action: Copy + Hash + Eq;
 
     fn get_states(&self) -> &[Self::State];
     fn get_actions(&self) -> &[Self::Action];
 
-    fn transition(
-        &self,
-        state: &Self::State,
-        action: &Self::Action,
-    ) -> HashMap<&Self::State, Probability>;
-
-    fn reward(
-        &self,
-        state: &Self::State,
-        action: &Self::Action,
-        next_state: &Self::State,
-    ) -> Reward;
+    fn transition(&self, state: Self::State, action: Self::Action)
+        -> &[(Self::State, Probability)];
+    fn reward(&self, state: Self::State, action: Self::Action, next_state: Self::State) -> Reward;
 
     fn state_actions(&self) -> StateActionIter<'_, Self::State, Self::Action> {
         let states = self.get_states().into_iter();
@@ -59,27 +50,27 @@ pub trait MDP {
 //         }
 //     }
 
-pub struct BasicMDP<'a, S, A>
+pub struct BasicMDP<S, A>
 where
-    S: Clone + Hash + Eq,
-    A: Clone + Hash + Eq,
+    S: Copy + Hash + Eq,
+    A: Copy + Hash + Eq,
 {
     states: Vec<S>,
     actions: Vec<A>,
-    transitions: HashMap<(&'a S, &'a A), HashMap<&'a S, Probability>>,
-    rewards: HashMap<(&'a S, &'a A, &'a S), Reward>,
+    transitions: HashMap<(S, A), Vec<(S, Probability)>>,
+    rewards: HashMap<(S, A, S), Reward>,
 }
 
-impl<'a, S, A> BasicMDP<'a, S, A>
+impl<S, A> BasicMDP<S, A>
 where
-    S: Clone + Hash + Eq,
-    A: Clone + Hash + Eq,
+    S: Copy + Hash + Eq,
+    A: Copy + Hash + Eq,
 {
     pub fn new(
         states: Vec<S>,
         actions: Vec<A>,
-        transitions: HashMap<(&'a S, &'a A), HashMap<&'a S, Probability>>,
-        rewards: HashMap<(&'a S, &'a A, &'a S), Reward>,
+        transitions: HashMap<(S, A), Vec<(S, Probability)>>,
+        rewards: HashMap<(S, A, S), Reward>,
     ) -> Self {
         BasicMDP {
             states,
@@ -90,10 +81,10 @@ where
     }
 }
 
-impl<S, A> MDP for BasicMDP<'_, S, A>
+impl<S, A> MDP for BasicMDP<S, A>
 where
-    S: Clone + Hash + Eq,
-    A: Clone + Hash + Eq,
+    S: Copy + Hash + Eq,
+    A: Copy + Hash + Eq,
 {
     type State = S;
     type Action = A;
@@ -106,16 +97,11 @@ where
         &self.actions
     }
 
-    fn transition(&self, state: &Self::State, action: &Self::Action) -> HashMap<&S, Probability> {
-        self.transitions[&(state, action)].clone() // TODO: avoid clone by returning a slice?
+    fn transition(&self, state: Self::State, action: Self::Action) -> &[(S, Probability)] {
+        &self.transitions[&(state, action)]
     }
 
-    fn reward(
-        &self,
-        state: &Self::State,
-        action: &Self::Action,
-        next_state: &Self::State,
-    ) -> Reward {
+    fn reward(&self, state: Self::State, action: Self::Action, next_state: Self::State) -> Reward {
         self.rewards[&(state, action, next_state)]
     }
 }
@@ -127,6 +113,7 @@ mod tests {
     struct VecMDP {
         states: Vec<u8>,
         actions: Vec<u16>,
+        transitions: Vec<(u8, Reward)>,
     }
 
     impl MDP for VecMDP {
@@ -142,17 +129,17 @@ mod tests {
 
         fn transition(
             &self,
-            _state: &Self::State,
-            _action: &Self::Action,
-        ) -> std::collections::HashMap<&Self::State, Probability> {
-            HashMap::new()
+            _state: Self::State,
+            _action: Self::Action,
+        ) -> &[(Self::State, Probability)] {
+            &self.transitions
         }
 
         fn reward(
             &self,
-            _state: &Self::State,
-            _action: &Self::Action,
-            _next_state: &Self::State,
+            _state: Self::State,
+            _action: Self::Action,
+            _next_state: Self::State,
         ) -> Reward {
             0.0
         }
@@ -163,6 +150,7 @@ mod tests {
         let mdp = VecMDP {
             states: vec![1, 2, 3],
             actions: vec![4, 5],
+            transitions: vec![],
         };
 
         assert_eq!(mdp.get_states(), [1, 2, 3]);
