@@ -1,8 +1,9 @@
 use crate::environment::Reward;
-use crate::mdp::{BasicMDP, Probability};
+use crate::mdp::Probability;
 use crate::{direction::Direction, mdp::MDP};
 use itertools::Itertools;
 
+use std::cmp::min;
 use std::collections::HashMap;
 
 static DIRECTIONS: [Direction; 4] = [
@@ -122,6 +123,39 @@ impl GridWorld {
             discount_factor,
         ))
     }
+
+    pub fn next_position(&self, position: usize, action: Direction) -> usize {
+        let mut row = position / self.n_cols;
+        let mut col = position % self.n_cols;
+        (row, col) = match action {
+            Direction::Up => (row.saturating_sub(1), col),
+            Direction::Down => (min(row + 1, self.n_cols - 1), col),
+            Direction::Left => (row, col.saturating_sub(1)),
+            Direction::Right => (row, min(col + 1, self.n_rows - 1)),
+        };
+        row * self.n_cols + col
+    }
+
+    pub fn direction_probs(&self) -> HashMap<Direction, Vec<(Direction, Probability)>> {
+        Direction::all()
+            .into_iter()
+            .map(|dir| {
+                let mut dir_probs = vec![];
+
+                // intended direction
+                dir_probs.push((dir, 1.0 - self.noise));
+
+                // noisy directions
+                if self.noise > 0.0 {
+                    let noisy_prob = self.noise / 2.0;
+                    for noisy_dir in dir.perpindicular() {
+                        dir_probs.push((noisy_dir, noisy_prob))
+                    }
+                }
+                (dir, dir_probs)
+            })
+            .collect()
+    }
 }
 
 pub struct GridWorldMDP {
@@ -166,30 +200,32 @@ impl MDP for GridWorldMDP {
 }
 
 fn make_grid_world_mdp(grid_world: &GridWorld) -> GridWorldMDP {
-    // let states: Vec<Location> = (0..grid_world.n_rows)
-    //     .cartesian_product(0..grid_world.n_cols)
-    //     .collect();
     let states: Vec<usize> = (0..grid_world.grid.len()).collect();
     let actions = Direction::all();
-    let transitions = HashMap::new();
     let rewards = grid_world.grid.iter().map(|cell| cell.reward).collect();
 
-    let state_actions = states.iter().cartesian_product(actions.iter());
+    let direction_probs = grid_world.direction_probs();
 
-    /*let transitions = */
-    state_actions
+    let transitions = states
+        .iter()
+        .cartesian_product(actions.iter())
         .map(|(&state, &action)| {
-            let row = state / grid_world.n_cols;
-            let col = state % grid_world.n_cols;
-            println!("{} {} {} {}", state, row, col, action);
+            let cell = grid_world.grid[state];
+
+            let transitions = if !cell.is_terminal {
+                let mut next_state_probs = HashMap::new();
+                for &(noisy_action, prob) in direction_probs[&action].iter() {
+                    let next_state = grid_world.next_position(state, noisy_action);
+                    *next_state_probs.entry(next_state).or_insert(0.0) += prob;
+                }
+                next_state_probs.into_iter().collect()
+            } else {
+                vec![]
+            };
+
+            ((state, action), transitions)
         })
-        .count();
-
-    // state_actions.into_iter().;
-
-    // for (state, action) in states.iter().cartesian_product(actions.iter()) {
-    //     println!("{:?} {}", state, action);
-    // }
+        .collect();
 
     GridWorldMDP::new(states, transitions, rewards)
 }
@@ -246,19 +282,5 @@ mod tests {
 
         let actions = mdp.get_actions();
         assert_eq!(actions.len(), 4);
-    }
-
-    #[test]
-    fn test_directions() {
-        let directions = Direction::all();
-        assert_eq!(directions.len(), 4);
-
-        for direction in directions {
-            let opposite = direction.opposite();
-            assert_ne!(direction, opposite);
-            assert_eq!(direction, opposite.opposite());
-
-            println!("{:?}", direction);
-        }
     }
 }

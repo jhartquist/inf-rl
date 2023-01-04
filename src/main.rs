@@ -1,7 +1,8 @@
+use direction::Direction;
+
 mod agent;
 mod direction;
 mod environment;
-mod frozen_lake;
 mod grid_world;
 mod mdp;
 mod policy;
