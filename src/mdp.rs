@@ -1,12 +1,8 @@
+use crate::environment::Reward;
+use itertools::{Itertools, Product};
 use std::hash::Hash;
 use std::{cmp::Eq, collections::HashMap};
 
-use itertools::{Itertools, Product};
-
-use crate::environment::Reward;
-use crate::policy::Policy;
-
-#[allow(dead_code)]
 type StateActionIter<'a, S, A> = Product<std::slice::Iter<'a, S>, std::slice::Iter<'a, A>>;
 
 pub type Probability = f64;
@@ -27,28 +23,7 @@ pub trait MDP {
         let actions = self.get_actions().into_iter();
         states.cartesian_product(actions)
     }
-
-    fn render_policy<P>(&self, _policy: &P) -> String
-    where
-        P: Policy<Self::State, Self::Action>,
-    {
-        unimplemented!();
-    }
 }
-
-//     fn print_transitions(&self) {
-//         let actions = self.actions();
-//         for state in self.states() {
-//             println!("state {:>2?}", state);
-//             for action in &actions {
-//                 println!("  {}", action);
-//                 for (next_state, prob) in self.transition(&state, &action) {
-//                     let reward = self.reward(&state, &action, &next_state);
-//                     println!("    {:>2?} {:>3.1}%  {}", next_state, prob * 100.0, reward);
-//                 }
-//             }
-//         }
-//     }
 
 pub struct BasicMDP<S, A>
 where

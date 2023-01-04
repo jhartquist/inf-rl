@@ -118,7 +118,6 @@ where
         num_iterations += 1;
 
         let policy = MDPPolicy::new(state_actions.clone());
-        // mdp.render_policy(&policy);
 
         let (state_values, _) = evaluate_policy(mdp, &policy, discount_rate, threshold);
         let new_state_actions = improve_policy(mdp, state_values, discount_rate);

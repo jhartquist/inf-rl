@@ -1,10 +1,11 @@
 use crate::environment::Reward;
 use crate::mdp::Probability;
+use crate::policy::Policy;
 use crate::{direction::Direction, mdp::MDP};
 use itertools::Itertools;
-
 use std::cmp::min;
 use std::collections::HashMap;
+use std::fmt::Write;
 
 static DIRECTIONS: [Direction; 4] = [
     Direction::Up,
@@ -14,7 +15,7 @@ static DIRECTIONS: [Direction; 4] = [
 ];
 
 #[rustfmt::skip]
-static FROZEN_LAKE_4X4: [&str; 4] = [
+pub static FROZEN_LAKE_4X4: [&str; 4] = [
   "SFFF", 
   "FHFH", 
   "FFFH", 
@@ -22,7 +23,7 @@ static FROZEN_LAKE_4X4: [&str; 4] = [
 ];
 
 #[rustfmt::skip]
-static FROZEN_LAKE_8X8: [&str; 8] = [
+pub static FROZEN_LAKE_8X8: [&str; 8] = [
   "SFFFFFFF",
   "FFFFFFFF",
   "FFFHFFFF",
@@ -156,6 +157,22 @@ impl GridWorld {
             })
             .collect()
     }
+
+    pub fn render_policy(&self, policy: &impl Policy<usize, Direction>) -> String {
+        {
+            let mut s = String::new();
+            for row in 0..self.n_rows {
+                for col in 0..self.n_cols {
+                    let index = row * self.n_cols + col;
+                    let action = policy.get_action(&index);
+                    write!(s, "{} ", action).unwrap();
+                }
+                writeln!(s).unwrap();
+            }
+            writeln!(s).unwrap();
+            s
+        }
+    }
 }
 
 pub struct GridWorldMDP {
@@ -199,7 +216,7 @@ impl MDP for GridWorldMDP {
     }
 }
 
-fn make_grid_world_mdp(grid_world: &GridWorld) -> GridWorldMDP {
+pub fn make_grid_world_mdp(grid_world: &GridWorld) -> GridWorldMDP {
     let states: Vec<usize> = (0..grid_world.grid.len()).collect();
     let actions = Direction::all();
     let rewards = grid_world.grid.iter().map(|cell| cell.reward).collect();

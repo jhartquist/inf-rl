@@ -1,4 +1,4 @@
-use direction::Direction;
+use crate::grid_world::{make_grid_world_mdp, GridWorld, FROZEN_LAKE_4X4, FROZEN_LAKE_8X8};
 
 mod agent;
 mod direction;
@@ -8,23 +8,30 @@ mod mdp;
 mod policy;
 mod policy_iteration;
 
-// use frozen_lake::FrozenLake;
-
-// use crate::mdp::MDP;
-
 fn main() -> Result<(), String> {
-    println!("hello");
-    // let env = FrozenLake::new(4, 4, 0, 15, vec![5, 7, 11, 12], true);
+    let discount_factor = 0.99;
+    let threshold = 1e-10;
+    let mut rng = rand::thread_rng();
 
-    // let discount_rate = 0.99;
-    // let threshold = 1e-10;
-    // let mut rng = rand::thread_rng();
+    let grid_world = GridWorld::from_map(&FROZEN_LAKE_4X4, 2.0 / 3.0, discount_factor).unwrap();
+    let mdp = make_grid_world_mdp(&grid_world);
 
-    // let policy = policy_iteration::policy_iteration(&env, discount_rate, threshold, &mut rng);
-    // println!("{}", env.render_policy(&policy));
+    println!("4x4\n===");
+    let policy = policy_iteration::policy_iteration(&mdp, discount_factor, threshold, &mut rng);
+    println!("{}", grid_world.render_policy(&policy));
 
-    // let policy = policy_iteration::value_iteration(&env, discount_rate, threshold);
-    // println!("{}", env.render_policy(&policy));
+    let policy = policy_iteration::value_iteration(&mdp, discount_factor, threshold);
+    println!("{}", grid_world.render_policy(&policy));
+
+    let grid_world = GridWorld::from_map(&FROZEN_LAKE_8X8, 2.0 / 3.0, discount_factor).unwrap();
+    let mdp = make_grid_world_mdp(&grid_world);
+
+    println!("8x8\n===");
+    let policy = policy_iteration::policy_iteration(&mdp, discount_factor, threshold, &mut rng);
+    println!("{}", grid_world.render_policy(&policy));
+
+    let policy = policy_iteration::value_iteration(&mdp, discount_factor, threshold);
+    println!("{}", grid_world.render_policy(&policy));
 
     Ok(())
 }
