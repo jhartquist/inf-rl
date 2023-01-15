@@ -2,23 +2,9 @@ use std::collections::HashMap;
 
 use ndarray::Array2;
 
-use crate::{environment::DiscreteEnvironment, policy::Policy, utils::DecaySchedule};
-
-pub struct DiscretePolicy<E: DiscreteEnvironment> {
-    state_actions: HashMap<E::State, E::Action>,
-}
-
-impl<E: DiscreteEnvironment> DiscretePolicy<E> {
-    pub fn new(state_actions: HashMap<E::State, E::Action>) -> Self {
-        DiscretePolicy { state_actions }
-    }
-}
-
-impl<E: DiscreteEnvironment> Policy<E::State, E::Action> for DiscretePolicy<E> {
-    fn get_action(&self, state: &E::State) -> E::Action {
-        self.state_actions[state].clone()
-    }
-}
+use crate::environment::DiscreteEnvironment;
+use crate::policy::DiscretePolicy;
+use crate::utils::DecaySchedule;
 
 pub fn q_learning<E>(
     env: &mut E,
@@ -28,15 +14,13 @@ pub fn q_learning<E>(
     _num_steps: usize,
     _log_interval: usize,
     _eval_episodes: usize,
-) -> DiscretePolicy<E>
+) -> DiscretePolicy<E::State, E::Action>
 where
     E: DiscreteEnvironment,
 {
     let _q = Array2::<f64>::zeros((env.num_states(), env.num_actions()));
 
-    DiscretePolicy {
-        state_actions: HashMap::new(),
-    }
+    DiscretePolicy::new(HashMap::new())
 }
 
 #[cfg(test)]
@@ -58,15 +42,16 @@ mod tests {
 
         let mut env = GridWorldEnv::new(mdp, rng);
 
-        let decay_alpha = LinearDecay::new(1e-2, 1e-4, 5000);
-        let decay_epsilon = LinearDecay::new(1.0, 0.1, 10);
+        let num_steps = 5000;
+        let decay_alpha = LinearDecay::new(1e-2, 1e-4, num_steps);
+        let decay_epsilon = LinearDecay::new(1.0, 0.1, num_steps);
 
         let _policy = q_learning(
             &mut env,
             discount_factor,
             decay_alpha,
             decay_epsilon,
-            5000,
+            num_steps,
             1000,
             1000,
         );

@@ -301,11 +301,11 @@ impl Environment for GridWorldEnv {
 
 impl DiscreteEnvironment for GridWorldEnv {
     fn num_states(&self) -> usize {
-        0
+        self.mdp.get_states().len()
     }
 
     fn num_actions(&self) -> usize {
-        0
+        self.mdp.get_actions().len()
     }
 }
 
