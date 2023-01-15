@@ -1,7 +1,7 @@
 use crate::environment::Reward;
 use itertools::{Itertools, Product};
+use std::cmp::Eq;
 use std::hash::Hash;
-use std::{cmp::Eq, collections::HashMap};
 
 type StateActionIter<'a, S, A> = Product<std::slice::Iter<'a, S>, std::slice::Iter<'a, A>>;
 
@@ -22,62 +22,6 @@ pub trait MDP {
         let states = self.get_states().into_iter();
         let actions = self.get_actions().into_iter();
         states.cartesian_product(actions)
-    }
-}
-
-pub struct BasicMDP<S, A>
-where
-    S: Copy + Hash + Eq,
-    A: Copy + Hash + Eq,
-{
-    states: Vec<S>,
-    actions: Vec<A>,
-    transitions: HashMap<(S, A), Vec<(S, Probability)>>,
-    rewards: HashMap<(S, A, S), Reward>,
-}
-
-impl<S, A> BasicMDP<S, A>
-where
-    S: Copy + Hash + Eq,
-    A: Copy + Hash + Eq,
-{
-    pub fn new(
-        states: Vec<S>,
-        actions: Vec<A>,
-        transitions: HashMap<(S, A), Vec<(S, Probability)>>,
-        rewards: HashMap<(S, A, S), Reward>,
-    ) -> Self {
-        BasicMDP {
-            states,
-            actions,
-            transitions,
-            rewards,
-        }
-    }
-}
-
-impl<S, A> MDP for BasicMDP<S, A>
-where
-    S: Copy + Hash + Eq,
-    A: Copy + Hash + Eq,
-{
-    type State = S;
-    type Action = A;
-
-    fn get_states(&self) -> &[Self::State] {
-        &self.states
-    }
-
-    fn get_actions(&self) -> &[Self::Action] {
-        &self.actions
-    }
-
-    fn transition(&self, state: Self::State, action: Self::Action) -> &[(S, Probability)] {
-        &self.transitions[&(state, action)]
-    }
-
-    fn reward(&self, state: Self::State, action: Self::Action, next_state: Self::State) -> Reward {
-        self.rewards[&(state, action, next_state)]
     }
 }
 

@@ -1,8 +1,12 @@
-use crate::environment::Reward;
+use crate::environment::{Environment, Reward, StepResult};
 use crate::mdp::Probability;
 use crate::policy::Policy;
 use crate::{direction::Direction, mdp::MDP};
 use itertools::Itertools;
+use rand::distributions::WeightedIndex;
+use rand::prelude::Distribution;
+use rand::rngs::ThreadRng;
+use rand::seq::SliceRandom;
 use std::cmp::min;
 use std::collections::HashMap;
 use std::fmt::Write;
@@ -55,7 +59,7 @@ pub struct GridWorld {
     n_cols: usize,
     starting_states: Vec<usize>,
     noise: f64,
-    discount_factor: f64,
+    pub discount_factor: f64,
 }
 
 impl GridWorld {
@@ -179,18 +183,43 @@ pub struct GridWorldMDP {
     states: Vec<usize>,
     transitions: HashMap<(usize, Direction), Vec<(usize, Probability)>>,
     rewards: Vec<Reward>,
+    pub grid_world: GridWorld,
 }
 
 impl GridWorldMDP {
-    pub fn new(
-        states: Vec<usize>,
-        transitions: HashMap<(usize, Direction), Vec<(usize, Probability)>>,
-        rewards: Vec<Reward>,
-    ) -> Self {
+    pub fn new(grid_world: GridWorld) -> Self {
+        let states: Vec<usize> = (0..grid_world.grid.len()).collect();
+        let actions = Direction::all();
+        let rewards = grid_world.grid.iter().map(|cell| cell.reward).collect();
+
+        let direction_probs = grid_world.direction_probs();
+
+        let transitions = states
+            .iter()
+            .cartesian_product(actions.iter())
+            .map(|(&state, &action)| {
+                let cell = grid_world.grid[state];
+
+                let transitions = if !cell.is_terminal {
+                    let mut next_state_probs = HashMap::new();
+                    for &(noisy_action, prob) in direction_probs[&action].iter() {
+                        let next_state = grid_world.next_position(state, noisy_action);
+                        *next_state_probs.entry(next_state).or_insert(0.0) += prob;
+                    }
+                    next_state_probs.into_iter().collect()
+                } else {
+                    vec![]
+                };
+
+                ((state, action), transitions)
+            })
+            .collect();
+
         GridWorldMDP {
             states,
             transitions,
             rewards,
+            grid_world,
         }
     }
 }
@@ -207,44 +236,77 @@ impl MDP for GridWorldMDP {
         &DIRECTIONS
     }
 
-    fn transition(&self, state: usize, action: Direction) -> &[(usize, Probability)] {
+    fn transition(
+        &self,
+        state: Self::State,
+        action: Self::Action,
+    ) -> &[(Self::State, Probability)] {
         &self.transitions[&(state, action)]
     }
 
-    fn reward(&self, _state: usize, _action: Direction, next_state: usize) -> Reward {
+    fn reward(
+        &self,
+        _state: Self::State,
+        _action: Self::Action,
+        next_state: Self::State,
+    ) -> Reward {
         self.rewards[next_state]
     }
 }
 
-pub fn make_grid_world_mdp(grid_world: &GridWorld) -> GridWorldMDP {
-    let states: Vec<usize> = (0..grid_world.grid.len()).collect();
-    let actions = Direction::all();
-    let rewards = grid_world.grid.iter().map(|cell| cell.reward).collect();
+// TODO: make mdp a reference so many environments can refer to the same MDP
+pub struct GridWorldEnv {
+    state: usize,
+    pub mdp: GridWorldMDP,
+    rng: ThreadRng,
+}
 
-    let direction_probs = grid_world.direction_probs();
+impl GridWorldEnv {
+    pub fn new(mdp: GridWorldMDP, mut rng: ThreadRng) -> Self {
+        let state = mdp
+            .grid_world
+            .starting_states
+            .choose(&mut rng)
+            .unwrap()
+            .clone();
+        GridWorldEnv { state, mdp, rng }
+    }
+}
 
-    let transitions = states
-        .iter()
-        .cartesian_product(actions.iter())
-        .map(|(&state, &action)| {
-            let cell = grid_world.grid[state];
+impl Environment for GridWorldEnv {
+    type State = usize;
+    type Action = Direction;
 
-            let transitions = if !cell.is_terminal {
-                let mut next_state_probs = HashMap::new();
-                for &(noisy_action, prob) in direction_probs[&action].iter() {
-                    let next_state = grid_world.next_position(state, noisy_action);
-                    *next_state_probs.entry(next_state).or_insert(0.0) += prob;
-                }
-                next_state_probs.into_iter().collect()
-            } else {
-                vec![]
-            };
+    fn current_state(&self) -> &Self::State {
+        &self.state
+    }
 
-            ((state, action), transitions)
-        })
-        .collect();
+    fn step(
+        &mut self,
+        action: &Self::Action,
+    ) -> Result<crate::environment::StepResult<Self::State>, String> {
+        let next_state_probs = self.mdp.transition(self.state, *action);
+        let (next_states, probs): (Vec<_>, Vec<_>) = next_state_probs.iter().cloned().unzip();
+        let dist = WeightedIndex::new(&probs).unwrap();
+        let next_state = next_states[dist.sample(&mut self.rng)];
+        let reward = self.mdp.reward(self.state, *action, next_state);
+        let is_done = self.mdp.grid_world.grid[next_state].is_terminal;
 
-    GridWorldMDP::new(states, transitions, rewards)
+        self.state = next_state;
+
+        Ok(StepResult::new(next_state, reward, is_done))
+    }
+
+    fn reset(&mut self) -> &Self::State {
+        self.state = self
+            .mdp
+            .grid_world
+            .starting_states
+            .choose(&mut self.rng)
+            .unwrap()
+            .clone();
+        &self.state
+    }
 }
 
 #[cfg(test)]
@@ -277,7 +339,7 @@ mod tests {
         assert_eq!(grid_world.starting_states.len(), 1);
         assert_eq!(grid_world.grid.iter().filter(|c| c.is_terminal).count(), 5);
 
-        let mdp = make_grid_world_mdp(&grid_world);
+        let mdp = GridWorldMDP::new(grid_world);
 
         let states = mdp.get_states();
         assert_eq!(states.len(), 16);
@@ -292,7 +354,7 @@ mod tests {
     #[test]
     fn make_grid_world_8x8() {
         let grid_world = GridWorld::from_map(&FROZEN_LAKE_8X8, 0.0, 1.0).unwrap();
-        let mdp = make_grid_world_mdp(&grid_world);
+        let mdp = GridWorldMDP::new(grid_world);
 
         let states = mdp.get_states();
         assert_eq!(states.len(), 64);

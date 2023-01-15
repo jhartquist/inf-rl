@@ -16,6 +16,7 @@ impl Direction {
         ]
     }
 
+    #[allow(dead_code)]
     pub fn opposite(&self) -> Self {
         match self {
             Direction::Up => Direction::Down,
