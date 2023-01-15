@@ -1,36 +1,9 @@
-use environment::Reward;
-use ndarray::Array;
-use policy::MDPPolicy;
-
-use crate::{
-    environment::Environment,
+use inf_rl::{
+    generate_episode,
     grid_world::{GridWorld, GridWorldEnv, GridWorldMDP, FROZEN_LAKE_4X4, FROZEN_LAKE_8X8},
-    policy::Policy,
+    policy_iteration,
 };
-
-mod agent;
-mod direction;
-mod environment;
-mod grid_world;
-mod mdp;
-mod policy;
-mod policy_iteration;
-
-fn generate_episode(env: &mut GridWorldEnv, policy: &MDPPolicy<GridWorldMDP>) -> Reward {
-    let mut is_done = false;
-    let mut state = env.reset().clone();
-    let mut total_reward = 0.0;
-
-    while !is_done {
-        let action = policy.get_action(&state);
-        let result = env.step(&action).unwrap();
-        is_done = result.is_done;
-        state = result.state;
-        total_reward += result.reward;
-    }
-
-    total_reward
-}
+use ndarray::Array;
 
 fn main() -> Result<(), String> {
     let discount_factor = 0.99;
