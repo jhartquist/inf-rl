@@ -1,4 +1,4 @@
-use crate::environment::{Environment, Reward, StepResult};
+use crate::environment::{DiscreteEnvironment, Environment, Reward, StepResult};
 use crate::mdp::Probability;
 use crate::policy::Policy;
 use crate::{direction::Direction, mdp::MDP};
@@ -59,7 +59,6 @@ pub struct GridWorld {
     n_cols: usize,
     starting_states: Vec<usize>,
     noise: f64,
-    pub discount_factor: f64,
 }
 
 impl GridWorld {
@@ -69,7 +68,6 @@ impl GridWorld {
         n_cols: usize,
         starting_states: Vec<usize>,
         noise: f64,
-        discount_factor: f64,
     ) -> Self {
         assert_eq!(grid.len(), n_rows * n_cols);
 
@@ -79,11 +77,10 @@ impl GridWorld {
             n_cols,
             starting_states,
             noise,
-            discount_factor,
         }
     }
 
-    pub fn from_map(map: &[&str], noise: f64, discount_factor: f64) -> Result<Self, String> {
+    pub fn from_map(map: &[&str], noise: f64) -> Result<Self, String> {
         let n_rows = map.len();
         if n_rows == 0 {
             return Err("zero rows".into());
@@ -119,14 +116,7 @@ impl GridWorld {
             })
             .collect::<Result<Vec<Cell>, String>>()?;
 
-        Ok(GridWorld::new(
-            grid,
-            n_rows,
-            n_cols,
-            starting_states,
-            noise,
-            discount_factor,
-        ))
+        Ok(GridWorld::new(grid, n_rows, n_cols, starting_states, noise))
     }
 
     pub fn next_position(&self, position: usize, action: Direction) -> usize {
@@ -309,6 +299,16 @@ impl Environment for GridWorldEnv {
     }
 }
 
+impl DiscreteEnvironment for GridWorldEnv {
+    fn num_states(&self) -> usize {
+        0
+    }
+
+    fn num_actions(&self) -> usize {
+        0
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -316,25 +316,25 @@ mod tests {
 
     #[test]
     fn zero_rows() {
-        let grid_world = GridWorld::from_map(&[], 0.0, 1.0);
+        let grid_world = GridWorld::from_map(&[], 0.0);
         assert!(grid_world.is_err());
     }
 
     #[test]
     fn zero_cols() {
-        let grid_world = GridWorld::from_map(&["", "", ""], 0.0, 1.0);
+        let grid_world = GridWorld::from_map(&["", "", ""], 0.0);
         assert!(grid_world.is_err());
     }
 
     #[test]
     fn different_length_rows() {
-        let grid_world = GridWorld::from_map(&["FF", "FF", "F"], 0.0, 1.0);
+        let grid_world = GridWorld::from_map(&["FF", "FF", "F"], 0.0);
         assert!(grid_world.is_err());
     }
 
     #[test]
     fn make_grid_world_4x4() {
-        let grid_world = GridWorld::from_map(&FROZEN_LAKE_4X4, 0.0, 1.0).unwrap();
+        let grid_world = GridWorld::from_map(&FROZEN_LAKE_4X4, 0.0).unwrap();
         assert_eq!(grid_world.grid.len(), 16);
         assert_eq!(grid_world.starting_states.len(), 1);
         assert_eq!(grid_world.grid.iter().filter(|c| c.is_terminal).count(), 5);
@@ -353,7 +353,7 @@ mod tests {
 
     #[test]
     fn make_grid_world_8x8() {
-        let grid_world = GridWorld::from_map(&FROZEN_LAKE_8X8, 0.0, 1.0).unwrap();
+        let grid_world = GridWorld::from_map(&FROZEN_LAKE_8X8, 0.0).unwrap();
         let mdp = GridWorldMDP::new(grid_world);
 
         let states = mdp.get_states();

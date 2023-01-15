@@ -4,8 +4,8 @@ use std::hash::Hash;
 pub type Reward = f64;
 
 pub trait Environment {
-    type State: Clone + Hash + Debug;
-    type Action: Clone + Hash + Debug + Display;
+    type State: Clone + Hash + Eq + Debug;
+    type Action: Clone + Hash + Eq + Debug + Display;
 
     fn current_state(&self) -> &Self::State;
     fn step(&mut self, action: &Self::Action) -> Result<StepResult<Self::State>, String>;
@@ -14,6 +14,11 @@ pub trait Environment {
     fn render(&self) -> String {
         unimplemented!();
     }
+}
+
+pub trait DiscreteEnvironment: Environment {
+    fn num_states(&self) -> usize;
+    fn num_actions(&self) -> usize;
 }
 
 #[derive(Debug, Clone, Copy)]

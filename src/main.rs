@@ -10,7 +10,7 @@ fn main() -> Result<(), String> {
     let threshold = 1e-5;
 
     let mut rng = rand::thread_rng();
-    let grid_world = GridWorld::from_map(&FROZEN_LAKE_4X4, 0.0, discount_factor).unwrap();
+    let grid_world = GridWorld::from_map(&FROZEN_LAKE_4X4, 0.0).unwrap();
     let mdp = GridWorldMDP::new(grid_world);
     let policy = policy_iteration::policy_iteration(&mdp, discount_factor, threshold, &mut rng);
     let mut env = GridWorldEnv::new(mdp, rng);
@@ -21,9 +21,9 @@ fn main() -> Result<(), String> {
 
     let rng = rand::thread_rng();
     let noise = 2.0 / 3.0;
-    let grid_world = GridWorld::from_map(&FROZEN_LAKE_8X8, noise, discount_factor).unwrap();
+    let grid_world = GridWorld::from_map(&FROZEN_LAKE_8X8, noise).unwrap();
     let mdp = GridWorldMDP::new(grid_world);
-    let policy = policy_iteration::value_iteration(&mdp, mdp.grid_world.discount_factor, threshold);
+    let policy = policy_iteration::value_iteration(&mdp, discount_factor, threshold);
     mdp.grid_world.render_policy(&policy);
 
     let mut env = GridWorldEnv::new(mdp, rng);

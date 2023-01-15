@@ -1,11 +1,7 @@
-use environment::Reward;
-use policy::MDPPolicy;
+use environment::{DiscreteEnvironment, Reward};
+use policy::DiscretePolicy;
 
-use crate::{
-    environment::Environment,
-    grid_world::{GridWorldEnv, GridWorldMDP},
-    policy::Policy,
-};
+use crate::policy::Policy;
 
 pub mod agent;
 pub mod direction;
@@ -14,8 +10,13 @@ pub mod grid_world;
 pub mod mdp;
 pub mod policy;
 pub mod policy_iteration;
+pub mod q_learning;
+pub mod utils;
 
-pub fn generate_episode(env: &mut GridWorldEnv, policy: &MDPPolicy<GridWorldMDP>) -> Reward {
+pub fn generate_episode<E: DiscreteEnvironment>(
+    env: &mut E,
+    policy: &DiscretePolicy<E::State, E::Action>,
+) -> Reward {
     let mut is_done = false;
     let mut state = env.reset().clone();
     let mut total_reward = 0.0;

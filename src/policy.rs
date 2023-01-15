@@ -1,23 +1,34 @@
 use std::collections::HashMap;
-
-use crate::mdp::MDP;
+use std::hash::Hash;
 
 pub trait Policy<S, A> {
     fn get_action(&self, state: &S) -> A;
 }
 
-pub struct MDPPolicy<M: MDP> {
-    state_actions: HashMap<M::State, M::Action>,
+pub struct DiscretePolicy<S, A>
+where
+    S: Hash + Eq,
+    A: Clone,
+{
+    state_actions: HashMap<S, A>,
 }
 
-impl<M: MDP> MDPPolicy<M> {
-    pub fn new(state_actions: HashMap<M::State, M::Action>) -> Self {
-        Self { state_actions }
+impl<S, A> DiscretePolicy<S, A>
+where
+    S: Hash + Eq,
+    A: Clone,
+{
+    pub fn new(state_actions: HashMap<S, A>) -> Self {
+        DiscretePolicy { state_actions }
     }
 }
 
-impl<M: MDP> Policy<M::State, M::Action> for MDPPolicy<M> {
-    fn get_action(&self, state: &M::State) -> M::Action {
+impl<S, A> Policy<S, A> for DiscretePolicy<S, A>
+where
+    S: Hash + Eq,
+    A: Clone,
+{
+    fn get_action(&self, state: &S) -> A {
         self.state_actions[state].clone()
     }
 }

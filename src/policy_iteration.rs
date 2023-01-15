@@ -2,7 +2,7 @@ use rand::{rngs::ThreadRng, seq::SliceRandom};
 
 use crate::{
     mdp::MDP,
-    policy::{MDPPolicy, Policy},
+    policy::{DiscretePolicy, Policy},
 };
 use std::collections::HashMap;
 
@@ -97,7 +97,7 @@ pub fn policy_iteration<M>(
     discount_rate: f64,
     threshold: f64,
     rng: &mut ThreadRng,
-) -> MDPPolicy<M>
+) -> DiscretePolicy<M::State, M::Action>
 where
     M: MDP,
 {
@@ -117,7 +117,7 @@ where
     loop {
         num_iterations += 1;
 
-        let policy = MDPPolicy::new(state_actions.clone());
+        let policy = DiscretePolicy::new(state_actions.clone());
 
         let (state_values, _) = evaluate_policy(mdp, &policy, discount_rate, threshold);
         let new_state_actions = improve_policy(mdp, state_values, discount_rate);
@@ -131,7 +131,11 @@ where
     }
 }
 
-pub fn value_iteration<M>(mdp: &M, discount_rate: f64, threshold: f64) -> MDPPolicy<M>
+pub fn value_iteration<M>(
+    mdp: &M,
+    discount_rate: f64,
+    threshold: f64,
+) -> DiscretePolicy<M::State, M::Action>
 where
     M: MDP,
 {
@@ -204,5 +208,5 @@ where
         })
         .collect();
 
-    MDPPolicy::new(state_actions)
+    DiscretePolicy::new(state_actions)
 }
